@@ -43,10 +43,10 @@ def _build_llm(temperature: float = 0.3):
             llm = ChatOpenAI(
                 api_key=nvidia_key,
                 base_url=os.getenv("NVIDIA_API_BASE", "https://integrate.api.nvidia.com/v1"),
-                model="nvidia/llama-3.1-70b-instruct",
+                model="bytedance/seed-oss-36b-instruct",
                 temperature=temperature,
             )
-            print("[Churn] NVIDIA LLM ready: llama-3.1-70b-instruct")
+            print("[Churn] NVIDIA LLM ready: bytedance/seed-oss-36b-instruct")
             return llm
         except Exception as exc:
             print(f"[Churn] NVIDIA unavailable: {exc}")

@@ -241,7 +241,7 @@ def _run_standalone(domain: str, context: Dict[str, Any]) -> Dict[str, Any]:
             {"agent": o.agent_name, "analysis": o.analysis}
             for o in result.agent_outputs
         ],
-        "agent_type": "heuristic",
+        "agent_type": context.get("agent_type", "heuristic"),
     }
 
 
@@ -255,7 +255,7 @@ def _call_api(url: str, payload: Dict[str, Any]) -> Dict[str, Any] | None:
     try:
         import requests
 
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, timeout=60)
         if resp.status_code == 200:
             return resp.json()
         st.warning(f"API returned {resp.status_code}: {resp.text}")
