@@ -35,9 +35,17 @@ class DecisionWorkflow:
             else "No agents were configured for this workflow"
         )
 
+        # Find the score from whichever agent produced it (decision agent, not
+        # explanation agent which is last but doesn't emit a score).
+        decision_score = 0.5
+        for output in reversed(outputs):
+            if isinstance(output.analysis, dict) and "score" in output.analysis:
+                decision_score = float(output.analysis["score"])
+                break
+
         return DecisionResult(
             decision=final_analysis.get("decision", "PENDING"),
-            decision_score=final_analysis.get("score", 0.5),
+            decision_score=decision_score,
             reasoning=final_reasoning,
             agent_outputs=outputs,
             domain=request.domain,
