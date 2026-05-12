@@ -30,30 +30,38 @@ from .rag_retriever import PaymentRAGRetriever
 
 
 def _build_llm(temperature: float = 0.3):
-    """Build an LLM in priority order: Ollama → Anthropic → None (mock).
+    """Build an LLM in priority order: Ollama Cloud → Anthropic → None (mock).
 
     Priority:
-      1. Local Ollama (OLLAMA_BASE_URL set, or default localhost) when a
-         model is available.
-      2. Anthropic Claude (ANTHROPIC_API_KEY set).
-      3. None → deterministic mock fallback.
+      1. Ollama Cloud / local — when OLLAMA_API_KEY is set, uses cloud with
+         Bearer-token auth; when key is absent, tries local Ollama.
+      2. Anthropic Claude — when ANTHROPIC_API_KEY is set.
+      3. None — deterministic mock fallback (tests always pass).
     """
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     model = os.getenv("OLLAMA_MODEL", "mistral")
+    api_key = os.getenv("OLLAMA_API_KEY", "")
 
     try:
-        from langchain_community.llms import Ollama
+        import httpx
+        from langchain_ollama import ChatOllama
 
-        llm = Ollama(model=model, base_url=base_url, temperature=temperature)
-        # Quick ping — raises if Ollama is not reachable or model not pulled
+        kwargs: dict = dict(model=model, base_url=base_url, temperature=temperature)
+        if api_key and not api_key.startswith("your-"):
+            kwargs["http_client"] = httpx.Client(
+                headers={"Authorization": f"Bearer {api_key}"}
+            )
+        llm = ChatOllama(**kwargs)
+        # Quick connectivity check — raises if server unreachable / model absent
         llm.invoke("ping")
-        print(f"[Payments] Ollama LLM ready: {model} @ {base_url}")
+        source = "Ollama Cloud" if api_key else "Ollama local"
+        print(f"[Payments] {source} LLM ready: {model}")
         return llm
     except Exception:
-        pass  # Ollama not available — try Anthropic
+        pass  # Ollama not available — fall through to Anthropic
 
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if api_key and not api_key.startswith("your-"):
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if anthropic_key and not anthropic_key.startswith("your-"):
         try:
             from langchain_anthropic import ChatAnthropic
 
@@ -61,32 +69,21 @@ def _build_llm(temperature: float = 0.3):
             return ChatAnthropic(
                 model="claude-3-sonnet-20240229",
                 temperature=temperature,
-                api_key=api_key,
+                api_key=anthropic_key,
             )
         except Exception as exc:
             print(f"[Payments] Could not initialise Claude: {exc}")
 
-    return None  # Both unavailable — run in mock mode
+    return None  # Both unavailable — mock mode
 
 
 def _invoke(llm, system: str, user: str, fallback: str) -> str:
     """Invoke *llm* with a system + user message; return *fallback* on error.
 
-    Handles both plain-text LLMs (Ollama) and chat models (Anthropic).
+    Both ChatOllama and ChatAnthropic use the messages protocol.
     """
     if llm is None:
         return fallback
-    try:
-        # Plain-text LLMs (Ollama) expect a single string
-        from langchain_community.llms import Ollama
-
-        if isinstance(llm, Ollama):
-            prompt = f"{system}\n\n{user}"
-            return llm.invoke(prompt)
-    except ImportError:
-        pass
-
-    # Chat models (ChatAnthropic, ChatOpenAI, …)
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -95,7 +92,6 @@ def _invoke(llm, system: str, user: str, fallback: str) -> str:
     except Exception as exc:
         print(f"[LLM] Invocation error: {exc}")
         return fallback
-
 
 
 # ---------------------------------------------------------------------------
