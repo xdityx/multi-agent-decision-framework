@@ -47,7 +47,9 @@ def _build_llm(temperature: float = 0.3):
                 headers={"Authorization": f"Bearer {api_key}"}
             )
         llm = ChatOllama(**kwargs)
-        llm.invoke("ping")
+        # Connectivity check — ChatOllama requires message objects, not plain strings
+        from langchain_core.messages import HumanMessage, SystemMessage
+        llm.invoke([SystemMessage(content="You are a helpful assistant."), HumanMessage(content="Say OK")])
         source = "Ollama Cloud" if api_key else "Ollama local"
         print(f"[Churn] {source} LLM ready: {model}")
         return llm
