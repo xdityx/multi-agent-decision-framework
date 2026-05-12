@@ -154,6 +154,53 @@ _fraud_rag = FraudRAGRetriever()
 
 
 # ============================================================================
+# Input Validation
+# ============================================================================
+
+
+def _validate_customer_id(customer_id: str) -> None:
+    """Raise HTTPException 400 if *customer_id* is not in CUST_00000..CUST_00049."""
+    if not customer_id.startswith("CUST_"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid customer ID format. Must start with 'CUST_' (e.g., CUST_00000).",
+        )
+    try:
+        num = int(customer_id[5:])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid customer ID format. Use CUST_XXXXX where X is a digit.",
+        )
+    if not (0 <= num < 50):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Customer ID out of range. Valid: CUST_00000 to CUST_00049 (got {customer_id}).",
+        )
+
+
+def _validate_transaction_id(transaction_id: str) -> None:
+    """Raise HTTPException 400 if *transaction_id* is not in TXN_00000000..TXN_00000099."""
+    if not transaction_id.startswith("TXN_"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid transaction ID format. Must start with 'TXN_' (e.g., TXN_00000000).",
+        )
+    try:
+        num = int(transaction_id[4:])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid transaction ID format. Use TXN_XXXXXXXX where X is a digit.",
+        )
+    if not (0 <= num < 100):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transaction ID out of range. Valid: TXN_00000000 to TXN_00000099 (got {transaction_id}).",
+        )
+
+
+# ============================================================================
 # Endpoints
 # ============================================================================
 
@@ -171,6 +218,7 @@ async def health_check():
 @app.post("/analyze/payments", response_model=DecisionResponse)
 async def analyze_payment(req: PaymentAnalysisRequest):
     """Analyze a payment for fraud using heuristic or LLM agents."""
+    _validate_customer_id(req.customer_id)
     try:
         if req.agent_type == "llm":
             agents = [
@@ -206,6 +254,8 @@ async def analyze_payment(req: PaymentAnalysisRequest):
             ],
             agent_type=req.agent_type or "heuristic",
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -213,6 +263,7 @@ async def analyze_payment(req: PaymentAnalysisRequest):
 @app.post("/analyze/churn", response_model=DecisionResponse)
 async def analyze_churn(req: ChurnAnalysisRequest):
     """Analyze customer churn risk using heuristic or LLM agents."""
+    _validate_customer_id(req.customer_id)
     try:
         if req.agent_type == "llm":
             agents = [
@@ -248,6 +299,8 @@ async def analyze_churn(req: ChurnAnalysisRequest):
             ],
             agent_type=req.agent_type or "heuristic",
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -255,6 +308,7 @@ async def analyze_churn(req: ChurnAnalysisRequest):
 @app.post("/analyze/fraud", response_model=DecisionResponse)
 async def analyze_fraud(req: FraudAnalysisRequest):
     """Analyze a transaction for fraud using heuristic or LLM agents."""
+    _validate_transaction_id(req.transaction_id)
     try:
         if req.agent_type == "llm":
             agents = [
@@ -290,6 +344,8 @@ async def analyze_fraud(req: FraudAnalysisRequest):
             ],
             agent_type=req.agent_type or "heuristic",
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

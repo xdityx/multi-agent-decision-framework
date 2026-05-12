@@ -40,6 +40,47 @@ from src.domains.fraud.tools import create_tools as create_fraud_tools
 
 
 # ============================================================================
+# Input Validation
+# ============================================================================
+
+
+def _validate_customer_id(customer_id: str) -> tuple[bool, str]:
+    """Return (True, "") if valid, else (False, error_message).
+
+    Valid range: CUST_00000 to CUST_00049 (matches the 50 synthetic customers).
+    """
+    if not customer_id:
+        return False, "Customer ID cannot be empty."
+    if not customer_id.startswith("CUST_"):
+        return False, "Invalid format — must start with 'CUST_' (e.g. CUST_00005)."
+    try:
+        num = int(customer_id[5:])
+    except ValueError:
+        return False, "Invalid format — use CUST_00000 to CUST_00049."
+    if not (0 <= num < 50):
+        return False, f"Out of range — valid IDs are CUST_00000 to CUST_00049 (got {customer_id})."
+    return True, ""
+
+
+def _validate_transaction_id(transaction_id: str) -> tuple[bool, str]:
+    """Return (True, "") if valid, else (False, error_message).
+
+    Valid range: TXN_00000000 to TXN_00000099 (matches the 100 synthetic transactions).
+    """
+    if not transaction_id:
+        return False, "Transaction ID cannot be empty."
+    if not transaction_id.startswith("TXN_"):
+        return False, "Invalid format — must start with 'TXN_' (e.g. TXN_00000005)."
+    try:
+        num = int(transaction_id[4:])
+    except ValueError:
+        return False, "Invalid format — use TXN_00000000 to TXN_00000099."
+    if not (0 <= num < 100):
+        return False, f"Out of range — valid IDs are TXN_00000000 to TXN_00000099 (got {transaction_id})."
+    return True, ""
+
+
+# ============================================================================
 # Page config
 # ============================================================================
 
@@ -350,16 +391,28 @@ st.markdown(
 if domain == "Payments":
     st.markdown("### 💳 Payment Fraud Detection")
 
-    col_a, col_b = st.columns(2)
+    col_a, col_b = st.columns([3, 1])
     with col_a:
-        customer_id = st.text_input("Customer ID", value="CUST_00000", key="pay_cid")
-    with col_b:
-        amount = st.number_input(
-            "Amount ($)", min_value=0.0, value=2500.0, step=100.0, key="pay_amt"
+        customer_id = st.text_input(
+            "Customer ID",
+            value="CUST_00000",
+            key="pay_cid",
+            help="Format: CUST_00000 to CUST_00049",
         )
+    with col_b:
+        st.info("**Available IDs**\nCUST_00000\nto\nCUST_00049")
 
-    if st.button("🔍 Analyze Payment", key="pay_btn", use_container_width=True):
-        with st.spinner("Running payment agents…"):
+    amount = st.number_input(
+        "Amount ($)", min_value=0.0, value=2500.0, step=100.0, key="pay_amt"
+    )
+
+    is_valid, err = _validate_customer_id(customer_id)
+    if not is_valid:
+        st.error(f"Invalid Customer ID: {err}")
+        st.stop()
+
+    if st.button("Analyze Payment", key="pay_btn", use_container_width=True):
+        with st.spinner("Running payment agents..."):
             payload = {
                 "customer_id": customer_id,
                 "amount": amount,
@@ -377,10 +430,24 @@ if domain == "Payments":
 elif domain == "Churn":
     st.markdown("### 📉 Customer Churn Prediction")
 
-    customer_id = st.text_input("Customer ID", value="CUST_00000", key="churn_cid")
+    col_a, col_b = st.columns([3, 1])
+    with col_a:
+        customer_id = st.text_input(
+            "Customer ID",
+            value="CUST_00000",
+            key="churn_cid",
+            help="Format: CUST_00000 to CUST_00049",
+        )
+    with col_b:
+        st.info("**Available IDs**\nCUST_00000\nto\nCUST_00049")
 
-    if st.button("🔍 Analyze Churn Risk", key="churn_btn", use_container_width=True):
-        with st.spinner("Running churn agents…"):
+    is_valid, err = _validate_customer_id(customer_id)
+    if not is_valid:
+        st.error(f"Invalid Customer ID: {err}")
+        st.stop()
+
+    if st.button("Analyze Churn Risk", key="churn_btn", use_container_width=True):
+        with st.spinner("Running churn agents..."):
             payload = {
                 "customer_id": customer_id,
                 "agent_type": agent_type.lower(),
@@ -397,12 +464,24 @@ elif domain == "Churn":
 elif domain == "Fraud":
     st.markdown("### 🛡️ Transaction Fraud Prevention")
 
-    transaction_id = st.text_input(
-        "Transaction ID", value="TXN_00000000", key="fraud_tid"
-    )
+    col_a, col_b = st.columns([3, 1])
+    with col_a:
+        transaction_id = st.text_input(
+            "Transaction ID",
+            value="TXN_00000000",
+            key="fraud_tid",
+            help="Format: TXN_00000000 to TXN_00000099",
+        )
+    with col_b:
+        st.info("**Available IDs**\nTXN_00000000\nto\nTXN_00000099")
 
-    if st.button("🔍 Analyze Fraud Risk", key="fraud_btn", use_container_width=True):
-        with st.spinner("Running fraud agents…"):
+    is_valid, err = _validate_transaction_id(transaction_id)
+    if not is_valid:
+        st.error(f"Invalid Transaction ID: {err}")
+        st.stop()
+
+    if st.button("Analyze Fraud Risk", key="fraud_btn", use_container_width=True):
+        with st.spinner("Running fraud agents..."):
             payload = {
                 "transaction_id": transaction_id,
                 "agent_type": agent_type.lower(),
